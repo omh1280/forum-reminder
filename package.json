@@ -9,8 +9,10 @@
   "author": "Ottavio Hartman <omh1280@gmail.com>, Trent Oswald <trentoswald@therebelrobot.com> (@therebelrobot)",
   "license": "Apache-2.0",
   "devDependencies": {
-    "eslint": "^4.0.0",
-    "eslint-config-cesium": "^2.0.0"
+    "eslint": "^3.19.0",
+    "eslint-config-airbnb-base": "^11.2.0",
+    "eslint-config-cesium": "^2.0.0",
+    "eslint-plugin-import": "^2.6.1"
   },
   "dependencies": {
     "body-parser": "^1.15.0",

@@ -1,29 +1,28 @@
-'use strict';
-var bodyParser = require('body-parser');
-var express = require('express');
-var gitHubWebHook = require('express-github-webhook');
-var rp = require('request-promise');
+const bodyParser = require('body-parser');
+const express = require('express');
+const gitHubWebHook = require('express-github-webhook');
+const rp = require('request-promise');
 
-var headers = {
+const headers = {
     'User-Agent': 'forum-reminder',
-    'Authorization': 'token ' + process.env.GITHUB_TOKEN
+    Authorization: `token ${process.env.GITHUB_TOKEN}`,
 };
 
-var webHookHandler = gitHubWebHook({
+const webHookHandler = gitHubWebHook({
     path: '/',
-    secret: process.env.SECRET || ''
+    secret: process.env.SECRET || '',
 });
 
 // Setup
-var app = express();
+const app = express();
 app.set('port', process.env.PORT || 5000);
 app.use(bodyParser.json());
 app.use(webHookHandler);
 
 function findLinksWithRegex(comments, regularExpression) {
-    var linkMatches = [];
-    for (var i = 0; i < comments.length; i++) {
-        var matchResult = comments[i].body.match(regularExpression);
+    const linkMatches = [];
+    for (let i = 0; i < comments.length; i += 1) {
+        const matchResult = comments[i].body.match(regularExpression);
         if (matchResult && !linkMatches.includes(matchResult[0])) {
             linkMatches.push(matchResult[0]);
         }
@@ -34,60 +33,56 @@ function findLinksWithRegex(comments, regularExpression) {
 function getComments(url) {
     return rp.get({
         uri: url,
-        headers: headers,
-        json: true
+        headers,
+        json: true,
     });
 }
 
 function postComment(url, message) {
     return rp.post({
         uri: url,
-        headers: headers,
+        headers,
         body: {
-            'body': message
+            body: message,
         },
-        json: true
+        json: true,
     });
 }
 
-function handleClosedIssue(data) {
-    var commentsUrl = data.issue.url + '/comments';
+function postToClosedIssue(data) {
+    const commentsUrl = `${data.issue.url}/comments`;
 
     // Return big Promise chain
     return getComments(commentsUrl)
-    .then(function(comments) {
-        return findLinksWithRegex(comments, /https:\/\/groups\.google\.com[^\s]*/ig);
-    })
-    .then(function(linkMatches) {
+    .then(comments => findLinksWithRegex(comments, /https:\/\/groups\.google\.com[^\s]*/ig))
+    .then((linkMatches) => {
         if (linkMatches.length === 0) {
             console.log('No google group links found in comments!');
-            return;
+            return undefined;
         }
         console.log('Found these links in the comments: ', linkMatches);
-        var message = 'Please make sure to update ' + linkMatches + ' on this closed issue.\n\n__I am a bot BEEEP BOOOP__';
+        const message = `Please make sure to update ${linkMatches} on this closed issue.\n\n__I am a bot BEEEP BOOOP__`;
         return postComment(commentsUrl, message);
     })
-    .then(function(status) {
-        console.log('GitHub API returned with: ' + status);
+    .then((status) => {
+        console.log(`GitHub API returned with: ${status}`);
     })
-    .catch(function(e) {
-        console.log('Got an ERROR: ' + e);
-    });
+    .catch(e => console.log(`Got an ERROR: ${e}`));
 }
 
 // Listen to `issues` WebHook
-webHookHandler.on('issues', function(repo, data) { //eslint-disable-line no-unused-vars
+webHookHandler.on('issues', (repo, data) => {
     if (data.action !== 'closed') {
         return;
     }
-    handleClosedIssue(data);
+    postToClosedIssue(data);
 });
 
-webHookHandler.on('error', function (err, req, res) { //eslint-disable-line no-unused-vars
-	console.log('An error occurred: ', err);
+webHookHandler.on('error', (err, req, res) => { // eslint-disable-line no-unused-vars
+    console.log('An error occurred: ', err);
 });
 
 // Listen to port specified by env.PORT
-app.listen(app.get('port'), function () {
-	console.log('Forum-reminder listening on port ' + app.get('port'));
+app.listen(app.get('port'), () => {
+    console.log(`Forum-reminder listening on port ${app.get('port')}`);
 });
