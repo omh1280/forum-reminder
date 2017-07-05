@@ -1,4 +1,4 @@
-const bodyParser = require('body-parser');
+const { json } = require('body-parser');
 const express = require('express');
 const gitHubWebHook = require('express-github-webhook');
 const rp = require('request-promise');
@@ -16,7 +16,7 @@ const webHookHandler = gitHubWebHook({
 // Setup
 const app = express();
 app.set('port', process.env.PORT || 5000);
-app.use(bodyParser.json());
+app.use(json());
 app.use(webHookHandler);
 
 function findLinksWithRegex(comments, regularExpression) {
@@ -30,17 +30,17 @@ function findLinksWithRegex(comments, regularExpression) {
     return linkMatches;
 }
 
-function getComments(url) {
+async function getComments(uri) {
     return rp.get({
-        uri: url,
+        uri,
         headers,
         json: true,
     });
 }
 
-function postComment(url, message) {
+async function postComment(uri, message = '') {
     return rp.post({
-        uri: url,
+        uri,
         headers,
         body: {
             body: message,
@@ -49,25 +49,23 @@ function postComment(url, message) {
     });
 }
 
-function postToClosedIssue(data) {
-    const commentsUrl = `${data.issue.url}/comments`;
+async function postToClosedIssue(data) {
+    try {
+        const commentsUrl = `${data.issue.url}/comments`;
 
-    // Return big Promise chain
-    return getComments(commentsUrl)
-    .then(comments => findLinksWithRegex(comments, /https:\/\/groups\.google\.com[^\s]*/ig))
-    .then((linkMatches) => {
+        const comments = await getComments(commentsUrl);
+        const linkMatches = findLinksWithRegex(comments, /https:\/\/groups\.google\.com[^\s]*/ig);
+
         if (linkMatches.length === 0) {
             console.log('No google group links found in comments!');
-            return undefined;
+            return;
         }
         console.log('Found these links in the comments: ', linkMatches);
-        const message = `Please make sure to update ${linkMatches} on this closed issue.\n\n__I am a bot BEEEP BOOOP__`;
-        return postComment(commentsUrl, message);
-    })
-    .then((status) => {
+        const status = await postComment(commentsUrl, `Please make sure to update ${linkMatches} on this closed issue.\n\n__I am a bot BEEEP BOOOP__`);
         console.log(`GitHub API returned with: ${status}`);
-    })
-    .catch(e => console.log(`Got an ERROR: ${e}`));
+    } catch (e) {
+        console.log(`Got an error: ${e}`);
+    }
 }
 
 // Listen to `issues` WebHook
